@@ -43,7 +43,7 @@ console.log(`SQLite connected: ${dbFilePath}`);
 
 /* GET ALL CUSTOMERS */
 
-app.get("/customers", (req, res) => {
+app.get("/api/customers", (req, res) => {
   try {
     const customers = db.prepare("SELECT * FROM customers ORDER BY id").all();
     res.json(customers);
@@ -56,7 +56,7 @@ app.get("/customers", (req, res) => {
 
 /* GET SINGLE CUSTOMER */
 
-app.get("/customers/:account", (req, res) => {
+app.get("/api/customers/:account", (req, res) => {
   const account = req.params.account;
   try {
     const result = db
@@ -73,7 +73,7 @@ app.get("/customers/:account", (req, res) => {
 
 /* MAKE PAYMENT */
 
-app.post("/payments", (req, res) => {
+app.post("/api/payments", (req, res) => {
   const { account_number, amount } = req.body;
   const paymentAmount = Number(amount);
 
@@ -126,7 +126,7 @@ app.post("/payments", (req, res) => {
 
 /* PAYMENT HISTORY */
 
-app.get("/payments/:account", (req, res) => {
+app.get("/api/payments/:account", (req, res) => {
   const account = req.params.account;
   try {
     const result = db.prepare(
