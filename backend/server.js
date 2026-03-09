@@ -145,7 +145,7 @@ app.get("/api/payments/:account", (req, res) => {
 
 });
 
-app.get("/health", (req, res) => {
+app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
@@ -153,7 +153,7 @@ app.get("/health", (req, res) => {
 
 app.use(express.static(frontendDistPath));
 
-app.get("/{*path}", (req, res, next) => {
+app.get("/api/{*path}", (req, res, next) => {
   if (req.path.startsWith("/customers") || req.path.startsWith("/payments")) {
     return next();
   }
