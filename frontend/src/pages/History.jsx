@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import api from "../api";
 import "../style/History.css";
 
 function History(){
@@ -10,7 +11,7 @@ function History(){
 
   useEffect(() => {
 
-    axios.get(`http://localhost:5000/payments/${account}`)
+    axios.get(`${api}/payments/${account}`)
       .then(res => setPayments(res.data));
 
   }, [account]);

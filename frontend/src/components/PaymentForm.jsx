@@ -1,5 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
+import api from "../api";
 import "../style/PaymentForm.css";
 
 function PaymentForm({ account }) {
@@ -15,7 +16,7 @@ function PaymentForm({ account }) {
 
     try {
 
-      const res = await axios.post("http://localhost:5000/payments", {
+      const res = await axios.post(`${api}/payments`, {
         account_number: account,
         amount: amount
       });

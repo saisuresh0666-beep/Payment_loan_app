@@ -1,8 +1,11 @@
 const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
+const path = require("path");
 
 const app = express();
+const port = process.env.PORT || 5000;
+const frontendDistPath = path.join(__dirname, "..", "frontend", "dist");
 
 app.use(cors());
 app.use(express.json());
@@ -10,10 +13,10 @@ app.use(express.json());
 /* DATABASE CONNECTION */
 
 const db = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "1234",
-  database: "payment_app_db"
+  host: process.env.DB_HOST || "localhost",
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "1234",
+  database: process.env.DB_NAME || "payment_app_db"
 });
 
 db.connect((err) => {
@@ -153,9 +156,21 @@ app.get("/payments/:account", (req, res) => {
 
 });
 
+/* STATIC FRONTEND */
+
+app.use(express.static(frontendDistPath));
+
+app.get("/{*path}", (req, res, next) => {
+  if (req.path.startsWith("/customers") || req.path.startsWith("/payments")) {
+    return next();
+  }
+
+  res.sendFile(path.join(frontendDistPath, "index.html"));
+});
+
 
 /* SERVER */
 
-app.listen(5000, () => {
-  console.log("Server running on port 5000");
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });

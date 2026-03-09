@@ -1,6 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import api from "../api";
 import PaymentForm from "../components/PaymentForm";
 import "../style/Customer.css";
 
@@ -11,7 +12,7 @@ function Customer(){
 
   useEffect(()=>{
 
-    axios.get(`http://localhost:5000/customers/${account}`)
+    axios.get(`${api}/customers/${account}`)
       .then(res => {
 
         if(res.data.length === 0){
