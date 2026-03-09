@@ -153,8 +153,8 @@ app.get("/api/health", (req, res) => {
 
 app.use(express.static(frontendDistPath));
 
-app.get("/api/{*path}", (req, res, next) => {
-  if (req.path.startsWith("/customers") || req.path.startsWith("/payments")) {
+app.get("/{*path}", (req, res, next) => {
+  if (req.path.startsWith("/api/")) {
     return next();
   }
 
