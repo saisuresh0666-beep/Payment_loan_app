@@ -1,0 +1,39 @@
+.payment-container{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin-top:20px;
+}
+
+.payment-input{
+  padding:10px;
+  border-radius:6px;
+  border:1px solid #ccc;
+}
+
+.payment-btn{
+  padding:10px;
+  border:none;
+  border-radius:6px;
+  background:#2563eb;
+  color:white;
+  cursor:pointer;
+}
+
+.payment-btn:hover{
+  background:#1e40af;
+}
+
+/* Mobile */
+
+@media(max-width:480px){
+
+  .payment-input{
+    width:100%;
+  }
+
+  .payment-btn{
+    width:100%;
+  }
+
+}

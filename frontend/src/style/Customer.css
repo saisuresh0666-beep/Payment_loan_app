@@ -1,0 +1,93 @@
+/* 1. Global Reset for Consistency */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.customer-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center; /* Centers vertically if container is full height */
+  min-height: 100vh;
+  padding: 20px;
+  background-color: #f9fafb;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+.customer-card {
+  width: 100%; /* Occupy full width available... */
+  max-width: 440px; /* ...but stop at 440px */
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.customer-card h2 {
+  text-align: center;
+  margin-bottom: 24px;
+  color: #111827;
+}
+
+/* 2. Flex Row Handling */
+.customer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  font-size: 16px;
+  gap: 10px; /* Prevents text from touching if long */
+}
+
+.customer-row span:first-child {
+  color: #6b7280; /* Label color */
+}
+
+.customer-row span:last-child {
+  font-weight: 600;
+  color: #111827; /* Value color */
+}
+
+/* 3. Helper Classes */
+.payment-box {
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.history-link {
+  display: inline-block;
+  margin-top: 20px;
+  text-decoration: none;
+  color: #2563eb;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+
+.history-link:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+/* --- Media Queries --- */
+
+/* Mobile & Small Screens */
+@media (max-width: 480px) {
+  .customer-container {
+    padding: 16px;
+    justify-content: flex-start; /* Start from top on small mobile */
+  }
+
+  .customer-card {
+    padding: 20px;
+    border-radius: 8px;
+  }
+
+  .customer-row {
+    font-size: 15px;
+    /* Optional: Stack rows if they contain long emails/names */
+    /* flex-direction: column; align-items: flex-start; */
+  }
+}

@@ -1,0 +1,89 @@
+/* 1. Container & Typography */
+.history-container {
+  max-width: 800px; /* Slightly wider for better readability */
+  margin: 2rem auto;
+  padding: 0 20px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #374151;
+}
+
+.history-container h2 {
+  text-align: center;
+  margin-bottom: 30px;
+  font-size: 1.75rem;
+}
+
+/* 2. Desktop Table Styles */
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden; /* Keeps corners rounded */
+}
+
+.history-table th {
+  background: #2563eb;
+  color: white;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+}
+
+.history-table th,
+.history-table td {
+  padding: 16px;
+  border-bottom: 1px solid #f3f4f6;
+  text-align: left;
+}
+
+.history-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* 3. The "Stacking" Mobile Transformation */
+@media (max-width: 650px) {
+  /* Hide the header row entirely */
+  .history-table thead {
+    display: none;
+  }
+
+  .history-table, 
+  .history-table tbody, 
+  .history-table tr, 
+  .history-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .history-table tr {
+    margin-bottom: 15px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px;
+  }
+
+  .history-table td {
+    text-align: right;
+    padding: 10px 15px;
+    position: relative;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .history-table td:last-child {
+    border-bottom: none;
+  }
+
+  /* Magic: Add labels using data-attributes */
+  .history-table td::before {
+    content: attr(data-label); /* Pulls text from HTML data-label */
+    position: absolute;
+    left: 15px;
+    width: 45%;
+    text-align: left;
+    font-weight: 700;
+    color: #6b7280;
+  }
+}
