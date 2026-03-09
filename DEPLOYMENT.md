@@ -18,46 +18,28 @@ Allow these inbound ports in the EC2 security group:
 - `80` for HTTP
 - `443` for HTTPS if you add SSL later
 
-## 2. Connect and install packages
+## 2. One-command automatic setup on EC2
 
 ```bash
-ssh -i your-key.pem ubuntu@your-ec2-public-ip
-sudo apt update
-sudo apt install -y nginx curl git
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs
-node -v
-npm -v
-```
-
-You should see Node.js 22.x.
-
-## 3. Clone the repo
-
-```bash
-cd /home/ubuntu
+ssh -i your-key.pem ubuntu@54.206.94.142
 git clone https://github.com/saisuresh0666-beep/Payment_loan_app.git
-cd /home/ubuntu/Payment_loan_app
+cd Payment_loan_app
+bash scripts/bootstrap-ec2.sh
 ```
 
-## 4. Install dependencies and build
+That script installs Node.js 22, Nginx, clones or updates the app, installs backend and frontend dependencies, builds the frontend, installs systemd and Nginx configs, starts the services, and verifies `http://127.0.0.1:5000/health`.
+
+If you want to override the public IP inside the generated Nginx config:
+
+```bash
+EC2_PUBLIC_IP=54.206.94.142 bash scripts/bootstrap-ec2.sh
+```
+
+## 3. Backend env
 
 ```bash
 cd /home/ubuntu/Payment_loan_app/backend
-npm ci
-cp .env.example .env
-
-cd /home/ubuntu/Payment_loan_app/frontend
-npm ci
-npm run build
-```
-
-## 5. Configure backend env
-
-Edit the backend environment file:
-
-```bash
-nano /home/ubuntu/Payment_loan_app/backend/.env
+nano .env
 ```
 
 Use:
@@ -67,113 +49,25 @@ PORT=5000
 DB_FILE=./data/payment_app.db
 ```
 
-## 6. Start once and verify
-
-```bash
-cd /home/ubuntu/Payment_loan_app/backend
-node server.js
-```
-
-Open a second SSH terminal and test:
-
-```bash
-curl http://127.0.0.1:5000/health
-```
-
-You should get:
-
-```json
-{"status":"ok"}
-```
-
-Press `Ctrl+C` in the first terminal after that check.
-
-## 7. Create systemd service
-
-```bash
-sudo nano /etc/systemd/system/loan-app.service
-```
-
-Paste:
-
-```ini
-[Unit]
-Description=Loan App Node Server
-After=network.target
-
-[Service]
-Type=simple
-User=ubuntu
-WorkingDirectory=/home/ubuntu/Payment_loan_app/backend
-EnvironmentFile=/home/ubuntu/Payment_loan_app/backend/.env
-ExecStart=/usr/bin/node /home/ubuntu/Payment_loan_app/backend/server.js
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable loan-app
-sudo systemctl start loan-app
-sudo systemctl status loan-app
-```
-
-## 8. Configure Nginx
-
-```bash
-sudo nano /etc/nginx/sites-available/loan-app
-```
-
-Paste:
-
-```nginx
-server {
-    listen 80;
-    server_name _;
-
-    location / {
-        proxy_pass http://127.0.0.1:5000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-Enable site:
-
-```bash
-sudo ln -s /etc/nginx/sites-available/loan-app /etc/nginx/sites-enabled/loan-app
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t
-sudo systemctl restart nginx
-```
-
-## 9. Open app in browser
+## 4. Open app in browser
 
 Visit:
 
 ```text
-http://your-ec2-public-ip
+http://54.206.94.142
 ```
 
-## 10. GitHub Actions secrets
+## 5. GitHub Actions secrets
 
 Add these repository secrets in GitHub:
 
-- `EC2_HOST` = your EC2 public IP or DNS
 - `EC2_USER` = `ubuntu`
 - `EC2_SSH_KEY` = full private key content from your `.pem` file
 - `EC2_PORT` = `22`
 
-## 11. CI/CD behavior
+`EC2_HOST` is already set in the workflow to `54.206.94.142`.
+
+## 6. CI/CD behavior
 
 The workflow file is `.github/workflows/ci-cd.yml`.
 
@@ -189,7 +83,7 @@ On every push to `main` or `master`, GitHub Actions will:
 8. Rebuild the frontend
 9. Restart the `loan-app` systemd service
 
-## 12. Useful EC2 commands
+## 7. Useful EC2 commands
 
 Check app status:
 

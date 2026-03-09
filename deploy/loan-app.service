@@ -1,0 +1,15 @@
+[Unit]
+Description=Loan App Node Server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Payment_loan_app/backend
+EnvironmentFile=/home/ubuntu/Payment_loan_app/backend/.env
+ExecStart=/usr/bin/node /home/ubuntu/Payment_loan_app/backend/server.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

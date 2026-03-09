@@ -1,5 +1,9 @@
 name: CI/CD
 
+env:
+  APP_DIR: /home/ubuntu/Payment_loan_app
+  EC2_HOST: 54.206.94.142
+
 on:
   push:
     branches:
@@ -49,21 +53,11 @@ jobs:
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.2.2
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ env.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: ${{ secrets.EC2_PORT || 22 }}
           script: |
-            export APP_DIR=/home/ubuntu/Payment_loan_app
+            export APP_DIR=${{ env.APP_DIR }}
             export BRANCH=${{ github.ref_name }}
-            cd $APP_DIR
-            git pull origin $BRANCH
-            cd backend
-            npm ci
-            [ -f .env ] || cp .env.example .env
-            cd ../frontend
-            npm ci
-            npm run build
-            sudo systemctl restart loan-app
-            sudo systemctl reload nginx
-            curl -f http://127.0.0.1:5000/health
+            bash $APP_DIR/scripts/deploy.sh
