@@ -1,46 +1,55 @@
 const express = require("express");
-const mysql = require("mysql2");
 const cors = require("cors");
+const fs = require("fs");
 const path = require("path");
+const { DatabaseSync } = require("node:sqlite");
 
 const app = express();
 const port = process.env.PORT || 5000;
 const frontendDistPath = path.join(__dirname, "..", "frontend", "dist");
+const dbFilePath = path.resolve(__dirname, process.env.DB_FILE || "./data/payment_app.db");
+const dbDirectory = path.dirname(dbFilePath);
 
 app.use(cors());
 app.use(express.json());
 
 /* DATABASE CONNECTION */
 
-const db = mysql.createConnection({
-  host: process.env.DB_HOST || "localhost",
-  user: process.env.DB_USER || "root",
-  password: process.env.DB_PASSWORD || "1234",
-  database: process.env.DB_NAME || "payment_app_db"
-});
+fs.mkdirSync(dbDirectory, { recursive: true });
 
-db.connect((err) => {
-  if (err) {
-    console.log(err);
-  } else {
-    console.log("MySQL Connected");
-  }
-});
+const db = new DatabaseSync(dbFilePath);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS customers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_number TEXT NOT NULL UNIQUE,
+    interest_rate REAL NOT NULL,
+    tenure INTEGER NOT NULL,
+    emi_due REAL NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id INTEGER NOT NULL,
+    payment_date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    payment_amount REAL NOT NULL,
+    status TEXT NOT NULL,
+    FOREIGN KEY (customer_id) REFERENCES customers(id)
+  );
+`);
+
+console.log(`SQLite connected: ${dbFilePath}`);
 
 
 /* GET ALL CUSTOMERS */
 
 app.get("/customers", (req, res) => {
-
-  db.query("SELECT * FROM customers", (err, result) => {
-
-    if (err) {
-      res.send(err);
-    } else {
-      res.json(result);
-    }
-
-  });
+  try {
+    const customers = db.prepare("SELECT * FROM customers ORDER BY id").all();
+    res.json(customers);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 
 });
 
@@ -48,22 +57,16 @@ app.get("/customers", (req, res) => {
 /* GET SINGLE CUSTOMER */
 
 app.get("/customers/:account", (req, res) => {
-
   const account = req.params.account;
+  try {
+    const result = db
+      .prepare("SELECT * FROM customers WHERE account_number = ?")
+      .all(account);
 
-  db.query(
-    "SELECT * FROM customers WHERE account_number = ?",
-    [account],
-    (err, result) => {
-
-      if (err) {
-        res.send(err);
-      } else {
-        res.json(result);
-      }
-
-    }
-  );
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 
 });
 
@@ -71,61 +74,52 @@ app.get("/customers/:account", (req, res) => {
 /* MAKE PAYMENT */
 
 app.post("/payments", (req, res) => {
-
   const { account_number, amount } = req.body;
+  const paymentAmount = Number(amount);
 
-  if (!account_number || !amount) {
+  if (!account_number || Number.isNaN(paymentAmount) || paymentAmount <= 0) {
     return res.status(400).json({
-      message: "Account number and amount required"
+      message: "Valid account number and amount required"
     });
   }
 
-  db.query(
-    "SELECT id, emi_due FROM customers WHERE account_number = ?",
-    [account_number],
-    (err, result) => {
+  let transactionStarted = false;
 
-      if (err) return res.send(err);
+  try {
+    const customer = db
+      .prepare("SELECT id, emi_due FROM customers WHERE account_number = ?")
+      .get(account_number);
 
-      if (result.length === 0) {
-        return res.json({ message: "Account not found" });
-      }
-
-      const customerId = result[0].id;
-      const emiDue = result[0].emi_due;
-
-      if (amount > emiDue) {
-        return res.json({ message: "Amount exceeds EMI due" });
-      }
-
-      /* INSERT PAYMENT */
-
-      db.query(
-        "INSERT INTO payments (customer_id, payment_date, payment_amount, status) VALUES (?, NOW(), ?, ?)",
-        [customerId, amount, "SUCCESS"],
-        (err) => {
-
-          if (err) return res.send(err);
-
-          /* UPDATE EMI DUE */
-
-          db.query(
-            "UPDATE customers SET emi_due = emi_due - ? WHERE id = ?",
-            [amount, customerId],
-            (err) => {
-
-              if (err) return res.send(err);
-
-              res.json({ message: "Payment Successful" });
-
-            }
-          );
-
-        }
-      );
-
+    if (!customer) {
+      return res.json({ message: "Account not found" });
     }
-  );
+
+    if (paymentAmount > customer.emi_due) {
+      return res.json({ message: "Amount exceeds EMI due" });
+    }
+
+    const insertPayment = db.prepare(
+      "INSERT INTO payments (customer_id, payment_amount, status) VALUES (?, ?, ?)"
+    );
+    const updateCustomer = db.prepare(
+      "UPDATE customers SET emi_due = emi_due - ? WHERE id = ?"
+    );
+
+    db.exec("BEGIN");
+    transactionStarted = true;
+    insertPayment.run(customer.id, paymentAmount, "SUCCESS");
+    updateCustomer.run(paymentAmount, customer.id);
+    db.exec("COMMIT");
+    transactionStarted = false;
+
+    res.json({ message: "Payment Successful" });
+  } catch (error) {
+    if (transactionStarted) {
+      db.exec("ROLLBACK");
+    }
+
+    res.status(500).json({ message: error.message });
+  }
 
 });
 
@@ -133,27 +127,26 @@ app.post("/payments", (req, res) => {
 /* PAYMENT HISTORY */
 
 app.get("/payments/:account", (req, res) => {
-
   const account = req.params.account;
+  try {
+    const result = db.prepare(
+      `SELECT payments.*
+       FROM payments
+       JOIN customers
+       ON payments.customer_id = customers.id
+       WHERE customers.account_number = ?
+       ORDER BY payments.payment_date DESC`
+    ).all(account);
 
-  db.query(
-    `SELECT payments.*
-     FROM payments
-     JOIN customers
-     ON payments.customer_id = customers.id
-     WHERE customers.account_number = ?`,
-    [account],
-    (err, result) => {
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 
-      if (err) {
-        res.send(err);
-      } else {
-        res.json(result);
-      }
+});
 
-    }
-  );
-
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
 });
 
 /* STATIC FRONTEND */

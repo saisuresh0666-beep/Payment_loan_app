@@ -1,0 +1,69 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Verify backend syntax
+        run: npm test
+        working-directory: backend
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT || 22 }}
+          script: |
+            export APP_DIR=/home/ubuntu/Payment_loan_app
+            export BRANCH=${{ github.ref_name }}
+            cd $APP_DIR
+            git pull origin $BRANCH
+            cd backend
+            npm ci
+            [ -f .env ] || cp .env.example .env
+            cd ../frontend
+            npm ci
+            npm run build
+            sudo systemctl restart loan-app
+            sudo systemctl reload nginx
+            curl -f http://127.0.0.1:5000/health

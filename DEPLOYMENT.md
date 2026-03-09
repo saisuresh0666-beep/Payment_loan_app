@@ -1,107 +1,120 @@
 # EC2 Deployment
 
-This project can run on a single Ubuntu EC2 instance with:
+This project runs on one Ubuntu EC2 instance with:
 
-- React frontend built into static files
-- Express backend serving the API and built frontend
-- MySQL on the same server
-- Optional Nginx reverse proxy on port 80
+- React frontend built to static files
+- Express backend serving API plus frontend
+- SQLite database file stored on the EC2 instance
+- Nginx reverse proxy on port 80
+- GitHub Actions CI/CD deploying to EC2 over SSH
 
-## 1. Install system packages
+## 1. Launch EC2
+
+Use Ubuntu 24.04 or 22.04.
+
+Allow these inbound ports in the EC2 security group:
+
+- `22` for SSH
+- `80` for HTTP
+- `443` for HTTPS if you add SSL later
+
+## 2. Connect and install packages
 
 ```bash
+ssh -i your-key.pem ubuntu@your-ec2-public-ip
 sudo apt update
-sudo apt install -y nginx mysql-server nodejs npm
+sudo apt install -y nginx curl git
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
 node -v
 npm -v
 ```
 
-If your Ubuntu image has an older Node.js version, install Node.js 20 or newer before continuing.
+You should see Node.js 22.x.
 
-## 2. Copy the project to the instance
-
-Clone the repo or upload the project, then go to the project directory:
+## 3. Clone the repo
 
 ```bash
-cd /home/ubuntu/loan
+cd /home/ubuntu
+git clone https://github.com/saisuresh0666-beep/Payment_loan_app.git
+cd /home/ubuntu/Payment_loan_app
 ```
 
-## 3. Install app dependencies
+## 4. Install dependencies and build
 
 ```bash
-cd backend && npm install
-cd ../frontend && npm install
-```
-
-## 4. Configure MySQL
-
-Create the database and required tables on the EC2 instance:
-
-```sql
-CREATE DATABASE payment_app_db;
-```
-
-Then import your schema/data for `customers` and `payments`.
-
-Create the backend environment file:
-
-```bash
-cd /home/ubuntu/loan/backend
+cd /home/ubuntu/Payment_loan_app/backend
+npm ci
 cp .env.example .env
-```
 
-Edit `.env` with your real MySQL credentials.
-
-## 5. Build the frontend
-
-```bash
-cd /home/ubuntu/loan/frontend
+cd /home/ubuntu/Payment_loan_app/frontend
+npm ci
 npm run build
 ```
 
-The Express app serves `frontend/dist`, so the frontend and backend will run from one Node process.
+## 5. Configure backend env
 
-## 6. Run the backend
-
-```bash
-cd /home/ubuntu/loan/backend
-PORT=5000 node server.js
-```
-
-Test:
+Edit the backend environment file:
 
 ```bash
-curl http://127.0.0.1:5000/customers
+nano /home/ubuntu/Payment_loan_app/backend/.env
 ```
 
-## 7. Run with systemd
+Use:
 
-Create a service file:
+```env
+PORT=5000
+DB_FILE=./data/payment_app.db
+```
+
+## 6. Start once and verify
+
+```bash
+cd /home/ubuntu/Payment_loan_app/backend
+node server.js
+```
+
+Open a second SSH terminal and test:
+
+```bash
+curl http://127.0.0.1:5000/health
+```
+
+You should get:
+
+```json
+{"status":"ok"}
+```
+
+Press `Ctrl+C` in the first terminal after that check.
+
+## 7. Create systemd service
 
 ```bash
 sudo nano /etc/systemd/system/loan-app.service
 ```
 
-Use this content:
+Paste:
 
 ```ini
 [Unit]
 Description=Loan App Node Server
-After=network.target mysql.service
+After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/ubuntu/loan/backend
-EnvironmentFile=/home/ubuntu/loan/backend/.env
-ExecStart=/usr/bin/node /home/ubuntu/loan/backend/server.js
-Restart=always
 User=ubuntu
+WorkingDirectory=/home/ubuntu/Payment_loan_app/backend
+EnvironmentFile=/home/ubuntu/Payment_loan_app/backend/.env
+ExecStart=/usr/bin/node /home/ubuntu/Payment_loan_app/backend/server.js
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Then enable it:
+Enable and start:
 
 ```bash
 sudo systemctl daemon-reload
@@ -112,13 +125,11 @@ sudo systemctl status loan-app
 
 ## 8. Configure Nginx
 
-Create an Nginx site:
-
 ```bash
 sudo nano /etc/nginx/sites-available/loan-app
 ```
 
-Use this config:
+Paste:
 
 ```nginx
 server {
@@ -136,29 +147,78 @@ server {
 }
 ```
 
-Enable it:
+Enable site:
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/loan-app /etc/nginx/sites-enabled/loan-app
+sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl restart nginx
 ```
 
-## 9. Open EC2 security group ports
+## 9. Open app in browser
 
-Allow:
+Visit:
 
-- `22` for SSH
-- `80` for HTTP
-- `443` for HTTPS if you add SSL later
+```text
+http://your-ec2-public-ip
+```
 
-You do not need to expose `5000` publicly if Nginx is used.
+## 10. GitHub Actions secrets
 
-## 10. Optional SSL
+Add these repository secrets in GitHub:
 
-If you point a domain to the EC2 public IP:
+- `EC2_HOST` = your EC2 public IP or DNS
+- `EC2_USER` = `ubuntu`
+- `EC2_SSH_KEY` = full private key content from your `.pem` file
+- `EC2_PORT` = `22`
+
+## 11. CI/CD behavior
+
+The workflow file is `.github/workflows/ci-cd.yml`.
+
+On every push to `main` or `master`, GitHub Actions will:
+
+1. Install backend dependencies
+2. Verify backend syntax
+3. Install frontend dependencies
+4. Build the frontend
+5. SSH into EC2
+6. Run `git pull`
+7. Run `npm ci` in backend and frontend
+8. Rebuild the frontend
+9. Restart the `loan-app` systemd service
+
+## 12. Useful EC2 commands
+
+Check app status:
 
 ```bash
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d your-domain.com -d www.your-domain.com
+sudo systemctl status loan-app
+```
+
+Restart app:
+
+```bash
+sudo systemctl restart loan-app
+```
+
+Check logs:
+
+```bash
+journalctl -u loan-app -n 100 --no-pager
+```
+
+Check Nginx:
+
+```bash
+sudo systemctl status nginx
+sudo nginx -t
+```
+
+Manual deploy after git push:
+
+```bash
+cd /home/ubuntu/Payment_loan_app
+bash scripts/deploy.sh
 ```
